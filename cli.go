@@ -141,32 +141,88 @@ func (c *cli) run() int {
 
 		sp := strings.Split(host, ":")
 		for _, proc := range procs.Procs {
-			username := proc.UserName
-			if len(username) > 8 {
-				username = fmt.Sprintf("%s+", username[:7])
-			}
+			userStr := buildUser(proc)
+			ttyStr := buildTty(proc)
+			stateStr := buildState(proc)
+			startStr := buildStart(proc)
+			timeStr := buildTime(proc)
+			cmdStr := buildCmd(proc)
 
-			ttyStr := strconv.FormatInt(proc.Stat.TtyNr, 10)
-			if ttyStr == "0" {
-				ttyStr = "?"
-			}
-
-			t := time.Now()
-			t = t.Truncate(time.Hour).Add(- time.Duration(t.Hour()) * time.Hour)
-			startStr := time.Unix(proc.Start, 0).Format("15:04")
-			if proc.Start < t.Unix() {
-				startStr = time.Unix(proc.Start, 0).Format("01/02")
-			}
-			timeStr := time.Unix(proc.Time, 0).Format("4:05")
-
-			cmd := strings.Join(proc.Cmdline.Args, " ")
-			if cmd == "" {
-				cmd = fmt.Sprintf("[%s]", proc.Status.Name)
-			}
-
-			fmt.Printf("%-15s %-8s %6d %3s  %3s %6d %6d %-8s %-4s %-7s %5s %s\n", sp[0], username, proc.Stat.Pid, proc.Cpu, proc.Memory, proc.Status.VmSize, proc.Status.VmRSS, ttyStr, proc.Stat.State, startStr, timeStr, cmd)
+			fmt.Printf("%-15s %-8s %6d %3s  %3s %6d %6d %-8s %-4s %-7s %5s %s\n", sp[0], userStr, proc.Stat.Pid, proc.Cpu, proc.Memory, proc.Status.VmSize, proc.Status.VmRSS, ttyStr, stateStr, startStr, timeStr, cmdStr)
 		}
 	}
 
 	return ExitOK
+}
+
+// builduser USER string
+func buildUser(proc proc.Proc) string {
+	s := proc.UserName
+	if len(s) > 8 {
+		s = fmt.Sprintf("%s+", s[:7])
+	}
+
+	return s
+}
+
+// buildTty TTY string
+func buildTty(proc proc.Proc) string {
+	s := strconv.FormatInt(proc.Stat.TtyNr, 10)
+	if s == "0" {
+		s = "?"
+	}
+
+	return s
+}
+
+// buildState STAT string
+func buildState(proc proc.Proc) string {
+	s := proc.Stat.State
+	if proc.Stat.Nice < 0 {
+		s = s + "<"
+	}
+	if proc.Stat.Nice > 0 {
+		s = s + "N"
+	}
+	if proc.Status.VmLck != 0 {
+		s = s + "L"
+	}
+	if proc.Stat.Session == proc.Status.Tgid {
+		s = s + "s"
+	}
+	if proc.Stat.NumThreads > 1 {
+		s = s + "l"
+	}
+	if proc.Stat.Pgrp == proc.Stat.Tpgid {
+		s = s + "+"
+	}
+
+	return s
+}
+
+// buildStart START string
+func buildStart(proc proc.Proc) string {
+	t := time.Now()
+	t = t.Truncate(time.Hour).Add(- time.Duration(t.Hour()) * time.Hour)
+	s := time.Unix(proc.Start, 0).Format("15:04")
+	if proc.Start < t.Unix() {
+		s = time.Unix(proc.Start, 0).Format("01/02")
+	}
+
+	return s
+}
+
+// buildTime TIME string
+func buildTime(proc proc.Proc) string {
+	return time.Unix(proc.Time, 0).Format("4:05")
+}
+
+// buildCmd COMMAND string
+func buildCmd(proc proc.Proc) string {
+	s := strings.Join(proc.Cmdline.Args, " ")
+	if s == "" {
+		s = fmt.Sprintf("[%s]", proc.Status.Name)
+	}
+
+	return s
 }
